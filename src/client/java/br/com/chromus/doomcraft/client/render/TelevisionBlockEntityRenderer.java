@@ -30,16 +30,16 @@ public final class TelevisionBlockEntityRenderer
     /*
      * Modelo-base voltado para NORTH:
      *
-     * - painel escuro do modelo: X 2..12, Y 4..13, Z 1.5..3.1;
-     * - a imagem é mantida dentro do painel;
-     * - SCREEN_FRONT fica 0.15 unidade de modelo à frente do vidro,
+     * - painel ampliado: X -6..15.5, Y 4..21, Z 0.8..3.2;
+     * - a imagem ocupa cerca de 1,21 × 0,90 bloco;
+     * - SCREEN_FRONT fica ligeiramente à frente do vidro,
      *   evitando z-fighting e impedindo que o painel preto oculte o frame.
      */
-    private static final float SCREEN_MIN_X = 2.20f / 16.0f;
-    private static final float SCREEN_MAX_X = 11.80f / 16.0f;
-    private static final float SCREEN_MIN_Y = 4.90f / 16.0f;
-    private static final float SCREEN_MAX_Y = 12.10f / 16.0f;
-    private static final float SCREEN_FRONT = 1.35f / 16.0f;
+    private static final float SCREEN_MIN_X = -5.20f / 16.0f;
+    private static final float SCREEN_MAX_X = 14.20f / 16.0f;
+    private static final float SCREEN_MIN_Y = 5.30f / 16.0f;
+    private static final float SCREEN_MAX_Y = 19.70f / 16.0f;
+    private static final float SCREEN_FRONT = 0.65f / 16.0f;
 
     /*
      * Valor de iluminação máxima usado pelo Minecraft.

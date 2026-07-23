@@ -1,11 +1,15 @@
 #include "doomcraft_bridge.h"
 
+#include "common/console/c_buttons.h"
 #include "common/console/c_dispatch.h"
 #include "common/console/keydef.h"
 #include "common/engine/d_eventbase.h"
 #include "common/engine/i_interface.h"
+#include "common/engine/gamestate.h"
+#include "common/menu/menustate.h"
 #include "common/rendering/v_video.h"
 #include "common/textures/m_png.h"
+#include "d_buttons.h"
 #include "v_palette.h"
 
 #include <algorithm>
@@ -110,6 +114,10 @@ namespace
             << ++inputSequence
             << " gui="
             << (GUICapture ? 1 : 0)
+            << " gamestate="
+            << static_cast<int>(gamestate)
+            << " menu="
+            << static_cast<int>(menuactive)
             << " "
             << message
             << '\n';
@@ -226,26 +234,87 @@ namespace
         bridgePaused = desired;
     }
 
-    /*
-     * Traduz as ações do Minecraft em teclas físicas do LZDoom.
-     *
-     * A implementação anterior enviava +forward/+use quando GUICapture era
-     * false. Isso funcionaria apenas dentro de uma fase e não acordava a tela
-     * inicial do FreeDoom, que verifica EV_KeyDown diretamente.
-     */
-    void ProcessAction(
+    constexpr uint16_t DOOMCRAFT_KEY_BASE = 0x6000;
+
+    bool IsGameplayInputContext()
+    {
+        return gamestate == GS_LEVEL &&
+               menuactive == MENU_Off &&
+               !GUICapture;
+    }
+
+    void SetGameplayButton(
+        int buttonIndex,
+        bool pressed
+    )
+    {
+        FButtonStatus* button =
+            buttonMap.GetButton(buttonIndex);
+
+        if (button == nullptr)
+        {
+            LogInput(
+                "button-map missing " +
+                std::to_string(buttonIndex)
+            );
+            return;
+        }
+
+        const uint16_t syntheticKey =
+            static_cast<uint16_t>(
+                DOOMCRAFT_KEY_BASE +
+                buttonIndex
+            );
+
+        if (pressed)
+        {
+            button->PressKey(syntheticKey);
+        }
+        else
+        {
+            button->ReleaseKey(syntheticKey);
+        }
+
+        LogInput(
+            std::string("button-map ") +
+            (pressed ? "down " : "up ") +
+            std::to_string(buttonIndex)
+        );
+    }
+
+    void ReleaseAllGameplayButtons()
+    {
+        const int buttons[] = {
+            Button_Forward,
+            Button_Back,
+            Button_Left,
+            Button_Right,
+            Button_Attack,
+            Button_Use,
+            Button_Speed
+        };
+
+        for (int buttonIndex : buttons)
+        {
+            SetGameplayButton(
+                buttonIndex,
+                false
+            );
+        }
+    }
+
+    void ProcessMenuOrTitleAction(
         const std::string& action,
         bool pressed
     )
     {
-        LogInput(
-            "action " +
-            action +
-            " " +
-            (pressed ? "1" : "0")
-        );
-
-        if (GUICapture)
+        /*
+         * Menu aberto: o LZDoom traduz GK_* em MKEY_*.
+         */
+        if (
+            menuactive != MENU_Off ||
+            GUICapture
+        )
         {
             if (action == "forward")
             {
@@ -268,31 +337,52 @@ namespace
                 action == "attack"
             )
             {
-                PostGuiKey(GK_RETURN, pressed);
+                PostGuiKey(
+                    GK_RETURN,
+                    pressed
+                );
             }
 
             return;
         }
 
+        /*
+         * Tela inicial/demonstração: exige EV_KeyDown/EV_KeyUp normal.
+         */
         if (action == "forward")
         {
-            PostNativeKey(KEY_UPARROW, pressed);
+            PostNativeKey(
+                KEY_UPARROW,
+                pressed
+            );
         }
         else if (action == "back")
         {
-            PostNativeKey(KEY_DOWNARROW, pressed);
+            PostNativeKey(
+                KEY_DOWNARROW,
+                pressed
+            );
         }
         else if (action == "left")
         {
-            PostNativeKey(KEY_LEFTARROW, pressed);
+            PostNativeKey(
+                KEY_LEFTARROW,
+                pressed
+            );
         }
         else if (action == "right")
         {
-            PostNativeKey(KEY_RIGHTARROW, pressed);
+            PostNativeKey(
+                KEY_RIGHTARROW,
+                pressed
+            );
         }
         else if (action == "attack")
         {
-            PostNativeKey(KEY_RCTRL, pressed);
+            PostNativeKey(
+                KEY_RCTRL,
+                pressed
+            );
         }
         else if (action == "use")
         {
@@ -304,37 +394,150 @@ namespace
         }
         else if (action == "speed")
         {
-            PostNativeKey(KEY_RSHIFT, pressed);
+            PostNativeKey(
+                KEY_RSHIFT,
+                pressed
+            );
         }
     }
 
-    void ProcessPulseCommand(const std::string& command)
+    /*
+     * Dentro da fase, manipula o ButtonMap diretamente. Isso elimina
+     * dependência dos bindings gravados no lzdoom.ini e evita que eventos
+     * sintéticos de teclado sejam descartados pela cadeia de responders.
+     *
+     * Fora da fase, mantém eventos nativos/GUI para título e menus.
+     */
+    void ProcessAction(
+        const std::string& action,
+        bool pressed
+    )
+    {
+        LogInput(
+            "action " +
+            action +
+            " " +
+            (pressed ? "1" : "0")
+        );
+
+        if (!IsGameplayInputContext())
+        {
+            ProcessMenuOrTitleAction(
+                action,
+                pressed
+            );
+            return;
+        }
+
+        if (action == "forward")
+        {
+            SetGameplayButton(
+                Button_Forward,
+                pressed
+            );
+        }
+        else if (action == "back")
+        {
+            SetGameplayButton(
+                Button_Back,
+                pressed
+            );
+        }
+        else if (action == "left")
+        {
+            SetGameplayButton(
+                Button_Left,
+                pressed
+            );
+        }
+        else if (action == "right")
+        {
+            SetGameplayButton(
+                Button_Right,
+                pressed
+            );
+        }
+        else if (action == "attack")
+        {
+            SetGameplayButton(
+                Button_Attack,
+                pressed
+            );
+        }
+        else if (action == "use")
+        {
+            SetGameplayButton(
+                Button_Use,
+                pressed
+            );
+        }
+        else if (action == "speed")
+        {
+            SetGameplayButton(
+                Button_Speed,
+                pressed
+            );
+        }
+    }
+
+    void ProcessPulseCommand(
+        const std::string& command
+    )
     {
         LogInput("pulse " + command);
 
+        if (command == "escape")
+        {
+            ReleaseAllGameplayButtons();
+
+            if (
+                menuactive != MENU_Off ||
+                GUICapture
+            )
+            {
+                PostGuiPulse(GK_ESCAPE);
+            }
+            else
+            {
+                PostNativePulse(
+                    KEY_ESCAPE,
+                    GK_ESCAPE
+                );
+            }
+
+            return;
+        }
+
         if (command == "weapprev")
         {
-            if (GUICapture)
+            if (
+                menuactive != MENU_Off ||
+                GUICapture
+            )
             {
                 PostGuiPulse(GK_PGUP);
             }
             else
             {
-                /*
-                 * Mantém o comando sem depender do binding local da instalação.
-                 */
-                QueueConsoleCommand("weapprev");
+                QueueConsoleCommand(
+                    "weapprev"
+                );
             }
         }
         else if (command == "weapnext")
         {
-            if (GUICapture)
+            if (
+                menuactive != MENU_Off ||
+                GUICapture
+            )
             {
                 PostGuiPulse(GK_PGDN);
             }
             else
             {
-                QueueConsoleCommand("weapnext");
+                QueueConsoleCommand(
+                    "weapnext"
+                );
             }
         }
     }
@@ -380,6 +583,7 @@ namespace
         }
         else if (operation == "PAUSE")
         {
+            ReleaseAllGameplayButtons();
             SetPaused(true);
         }
         else if (operation == "RESUME")
@@ -388,6 +592,7 @@ namespace
         }
         else if (operation == "QUIT")
         {
+            ReleaseAllGameplayButtons();
             QueueConsoleCommand("quit");
         }
         else if (operation == "ACTION")

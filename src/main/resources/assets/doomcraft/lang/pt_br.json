@@ -24,8 +24,9 @@
   "key.doomcraft.weapon_next": "Doom: próxima arma",
   "message.doomcraft.wad_notice": "DoomCraft não inclui arquivos WAD. Coloque seus arquivos .wad em: %s",
   "message.doomcraft.no_wad": "Nenhum WAD encontrado. Coloque um arquivo .wad em: %s",
-  "message.doomcraft.controls_enabled": "Controles do Doom capturados. F8 libera.",
+  "message.doomcraft.controls_enabled": "Controles do Doom capturados. Backspace abre/volta menus; F8 libera.",
   "message.doomcraft.controls_disabled": "Controles do Doom liberados.",
   "message.doomcraft.controls_unavailable": "Aproxime-se até 4 blocos de uma TV ativa com WAD disponível.",
-  "message.doomcraft.interact_hint": "A TV funciona automaticamente. F8 captura os controles; agachar + usar alterna o estado quebrado."
+  "message.doomcraft.interact_hint": "A TV funciona automaticamente. F8 captura os controles; Backspace abre/volta menus; agachar + usar alterna o estado quebrado.",
+  "key.doomcraft.menu_back": "Doom: voltar/abrir menu"
 }
