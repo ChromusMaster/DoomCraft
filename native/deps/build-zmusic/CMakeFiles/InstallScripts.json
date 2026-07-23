@@ -1,0 +1,21 @@
+{
+	"InstallScripts" : 
+	[
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/miniz/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/game-music-emu/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/game-music-emu/gme/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/dumb/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/adlmidi/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/opnmidi/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/timidity/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/timidityplus/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/wildmidi/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/oplsynth/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/libxmp/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/thirdparty/fluidsynth/src/cmake_install.cmake",
+		"/mnt/2TB/Repository/DoomCraft/native/deps/build-zmusic/source/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

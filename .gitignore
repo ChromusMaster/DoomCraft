@@ -1,0 +1,10 @@
+.gradle/
+build/
+run/
+out/
+.idea/
+*.iml
+native/work/
+native/build/
+src/main/resources/natives/
+!src/main/resources/natives/.gitkeep

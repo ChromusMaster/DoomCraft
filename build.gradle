@@ -1,0 +1,93 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        doomcraft {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand 'version': inputs.properties.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    withSourcesJar()
+}
+
+jar {
+    from('LICENSE') {
+        rename { "${it}_${project.base.archivesName.get()}" }
+    }
+    from('THIRD_PARTY_NOTICES.md')
+}
+
+def pythonExecutable = providers.environmentVariable('PYTHON').orElse(
+        org.gradle.internal.os.OperatingSystem.current().isWindows() ? 'py' : 'python3'
+)
+
+tasks.register('prepareLzDoom', Exec) {
+    group = 'doomcraft native'
+    description = 'Extracts LZDoom 4.14.4 and applies the DoomCraft bridge patch.'
+    commandLine pythonExecutable.get(), 'native/tools/prepare_lzdoom.py'
+    inputs.file 'native/vendor/lzdoom-l4.14.4.zip'
+    inputs.dir 'native/bridge'
+    outputs.dir 'native/work/lzdoom-l4.14.4'
+}
+
+tasks.register('buildNative', Exec) {
+    group = 'doomcraft native'
+    description = 'Builds the patched native LZDoom executable for the current platform.'
+    dependsOn 'prepareLzDoom'
+    commandLine pythonExecutable.get(), 'native/tools/build_lzdoom.py'
+    inputs.dir 'native/work/lzdoom-l4.14.4'
+    outputs.dir 'src/main/resources/natives'
+}
+
+tasks.register('verifyDoomCraftSource', Exec) {
+    group = 'verification'
+    description = 'Performs offline structural checks on project files and native patch points.'
+    commandLine pythonExecutable.get(), 'scripts/verify_project.py'
+}
+
+tasks.register('verifyDoomCraftDistribution', Exec) {
+    group = 'verification'
+    description = 'Validates a clean DoomCraft source distribution, including packaging hygiene.'
+    commandLine pythonExecutable.get(), 'scripts/verify_project.py', '--distribution'
+}
+
+check.dependsOn 'verifyDoomCraftSource'

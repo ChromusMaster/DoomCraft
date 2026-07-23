@@ -1,0 +1,14 @@
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/libzmusic.so.1.1.14
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/libzmusic.so.1
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/libzmusic.so
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/include/zmusic.h
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/libzmusiclite.so.1.1.14
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/libzmusiclite.so.1
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/libzmusiclite.so
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/include/zmusic.h
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/cmake/ZMusic/ZMusicFullTargets.cmake
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/cmake/ZMusic/ZMusicFullTargets-release.cmake
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/cmake/ZMusic/ZMusicLiteTargets.cmake
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/cmake/ZMusic/ZMusicLiteTargets-release.cmake
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/cmake/ZMusic/ZMusicConfig.cmake
+/mnt/2TB/Repository/DoomCraft/native/deps/install-zmusic/lib/cmake/ZMusic/ZMusicConfigVersion.cmake

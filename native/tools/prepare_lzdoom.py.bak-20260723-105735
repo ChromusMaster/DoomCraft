@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+"""Extract the vendored LZDoom source and apply DoomCraft's small bridge patch."""
+from __future__ import annotations
+
+import shutil
+import sys
+import zipfile
+from pathlib import Path
+from typing import NoReturn
+
+PROJECT = Path(__file__).resolve().parents[2]
+ARCHIVE = PROJECT / "native/vendor/lzdoom-l4.14.4.zip"
+WORK_PARENT = PROJECT / "native/work"
+SOURCE = WORK_PARENT / "lzdoom-l4.14.4"
+BRIDGE = PROJECT / "native/bridge"
+
+
+def fail(message: str) -> NoReturn:
+    raise SystemExit(message)
+
+
+def extract() -> None:
+    if SOURCE.is_dir():
+        return
+    if not ARCHIVE.is_file():
+        fail(f"Missing archive: {ARCHIVE}")
+    WORK_PARENT.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(ARCHIVE) as archive:
+        roots = {Path(name).parts[0] for name in archive.namelist() if Path(name).parts}
+        if roots != {"lzdoom-l4.14.4"}:
+            fail(f"Unexpected archive root(s): {sorted(roots)}")
+
+        extraction_root = WORK_PARENT.resolve()
+        for info in archive.infolist():
+            destination = (WORK_PARENT / info.filename).resolve()
+            if not destination.is_relative_to(extraction_root):
+                fail(f"Unsafe path in LZDoom archive: {info.filename}")
+
+        archive.extractall(WORK_PARENT)
+
+
+def copy_bridge() -> None:
+    for name in ("doomcraft_bridge.h", "doomcraft_bridge.cpp"):
+        shutil.copy2(BRIDGE / name, SOURCE / "src" / name)
+
+
+def patch_cmake() -> None:
+    path = SOURCE / "src/CMakeLists.txt"
+    text = path.read_text(encoding="utf-8")
+    marker = "\tdoomcraft_bridge.cpp\n"
+    if marker not in text:
+        anchor = "\td_main.cpp\n"
+        if anchor not in text:
+            fail("Could not find d_main.cpp in src/CMakeLists.txt")
+        text = text.replace(anchor, anchor + marker, 1)
+        path.write_text(text, encoding="utf-8")
+
+
+def patch_display() -> None:
+    path = SOURCE / "src/d_main.cpp"
+    text = path.read_text(encoding="utf-8")
+    include = '#include "doomcraft_bridge.h"\n'
+    if include not in text:
+        anchor = '#include "v_palette.h"\n'
+        if anchor not in text:
+            fail("Could not find include patch point in d_main.cpp")
+        text = text.replace(anchor, anchor + include, 1)
+
+    call = "\tDoomCraftBridge::OnFrame(screen);\n"
+    if call not in text:
+        anchor = "\tscreen->Update();\n"
+        if anchor not in text:
+            fail("Could not find screen->Update patch point in d_main.cpp")
+        text = text.replace(anchor, anchor + call, 1)
+    path.write_text(text, encoding="utf-8")
+
+
+def verify() -> None:
+    cmake = (SOURCE / "src/CMakeLists.txt").read_text(encoding="utf-8")
+    main = (SOURCE / "src/d_main.cpp").read_text(encoding="utf-8")
+    required = [
+        ("doomcraft_bridge.cpp" in cmake, "CMake source registration"),
+        ('#include "doomcraft_bridge.h"' in main, "bridge include"),
+        ("DoomCraftBridge::OnFrame(screen);" in main, "frame hook"),
+    ]
+    missing = [name for ok, name in required if not ok]
+    if missing:
+        fail("Patch verification failed: " + ", ".join(missing))
+
+
+def main() -> None:
+    extract()
+    copy_bridge()
+    patch_cmake()
+    patch_display()
+    verify()
+    print(f"Prepared patched LZDoom source: {SOURCE}")
+
+
+if __name__ == "__main__":
+    main()
