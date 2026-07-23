@@ -1,7 +1,6 @@
 #include "doomcraft_bridge.h"
 
 #include "common/console/c_dispatch.h"
-#include "common/console/keydef.h"
 #include "common/engine/d_eventbase.h"
 #include "common/engine/i_interface.h"
 #include "common/rendering/v_video.h"
@@ -24,13 +23,10 @@
 namespace fs = std::filesystem;
 
 /*
- * Mantida pelo backend de entrada do LZDoom.
+ * Global mantida pela camada de entrada do LZDoom.
  *
- * true:
- *   menus, caixas de diálogo e telas GUI esperam EV_GUI_Event.
- *
- * false:
- *   title screen, demo screen e gameplay esperam EV_KeyDown/EV_KeyUp.
+ * true  = menus, telas iniciais e diálogos esperam EV_GUI_Event.
+ * false = a fase aceita os comandos normais de gameplay.
  */
 extern bool GUICapture;
 
@@ -46,13 +42,9 @@ namespace
     bool initialized = false;
     bool bridgePaused = false;
     uint64_t frameSequence = 0;
-    uint64_t inputSequence = 0;
-
     fs::path bridgeDirectory;
     fs::path commandDirectory;
     fs::path framePath;
-    fs::path inputLogPath;
-
     std::chrono::steady_clock::time_point lastFrameTime{};
 
     std::string Trim(std::string value)
@@ -88,33 +80,6 @@ namespace
                );
     }
 
-    void LogInput(const std::string& message)
-    {
-        if (inputLogPath.empty())
-        {
-            return;
-        }
-
-        std::ofstream output(
-            inputLogPath,
-            std::ios::out |
-            std::ios::app
-        );
-
-        if (!output)
-        {
-            return;
-        }
-
-        output
-            << ++inputSequence
-            << " gui="
-            << (GUICapture ? 1 : 0)
-            << " "
-            << message
-            << '\n';
-    }
-
     void Initialize()
     {
         if (initialized)
@@ -124,8 +89,7 @@ namespace
 
         initialized = true;
 
-        const char* environment =
-            std::getenv("DOOMCRAFT_BRIDGE_DIR");
+        const char* environment = std::getenv("DOOMCRAFT_BRIDGE_DIR");
 
         if (environment == nullptr || *environment == '\0')
         {
@@ -135,70 +99,24 @@ namespace
         bridgeDirectory = fs::u8path(environment);
         commandDirectory = bridgeDirectory / "commands";
         framePath = bridgeDirectory / "frame.bin";
-        inputLogPath = bridgeDirectory / "bridge-input.log";
 
         std::error_code error;
         fs::create_directories(commandDirectory, error);
-
-        LogInput("bridge initialized");
     }
 
     void QueueConsoleCommand(const std::string& command)
     {
-        LogInput("console " + command);
         AddCommandString(command.c_str());
     }
 
-    /*
-     * Publica uma tecla exatamente como o backend SDL publicaria quando
-     * GUICapture está desativado.
-     *
-     * Isso é indispensável para:
-     * - telas iniciais "press any key";
-     * - sequência de demonstração;
-     * - gameplay e bindings configuráveis.
-     */
-    void PostNativeKey(
-        int keyCode,
-        bool pressed,
-        int asciiCode = 0
-    )
-    {
-        event_t event{};
-        event.type = pressed ? EV_KeyDown : EV_KeyUp;
-        event.data1 = static_cast<int16_t>(keyCode);
-        event.data2 = static_cast<int16_t>(asciiCode);
-
-        LogInput(
-            std::string("native-key ") +
-            (pressed ? "down " : "up ") +
-            std::to_string(keyCode)
-        );
-
-        D_PostEvent(&event);
-    }
-
-    /*
-     * Publica uma tecla conforme o backend SDL quando GUICapture está ativo.
-     */
     void PostGuiKey(int guiKey, bool pressed)
     {
         event_t event{};
         event.type = EV_GUI_Event;
-        event.subtype =
-            pressed
-                ? EV_GUI_KeyDown
-                : EV_GUI_KeyUp;
+        event.subtype = pressed ? EV_GUI_KeyDown : EV_GUI_KeyUp;
         event.data1 = static_cast<int16_t>(guiKey);
         event.data2 = static_cast<int16_t>(guiKey);
         event.data3 = 0;
-
-        LogInput(
-            std::string("gui-key ") +
-            (pressed ? "down " : "up ") +
-            std::to_string(guiKey)
-        );
-
         D_PostEvent(&event);
     }
 
@@ -206,12 +124,6 @@ namespace
     {
         PostGuiKey(guiKey, true);
         PostGuiKey(guiKey, false);
-    }
-
-    void PostNativePulse(int keyCode, int asciiCode = 0)
-    {
-        PostNativeKey(keyCode, true, asciiCode);
-        PostNativeKey(keyCode, false, asciiCode);
     }
 
     void SetPaused(bool desired)
@@ -227,24 +139,11 @@ namespace
     }
 
     /*
-     * Traduz as ações do Minecraft em teclas físicas do LZDoom.
-     *
-     * A implementação anterior enviava +forward/+use quando GUICapture era
-     * false. Isso funcionaria apenas dentro de uma fase e não acordava a tela
-     * inicial do FreeDoom, que verifica EV_KeyDown diretamente.
+     * Durante a GUI, setas e Enter precisam virar EV_GUI_Event.
+     * Durante a fase, os comandos +forward, +use etc. continuam sendo usados.
      */
-    void ProcessAction(
-        const std::string& action,
-        bool pressed
-    )
+    void ProcessAction(const std::string& action, bool pressed)
     {
-        LogInput(
-            "action " +
-            action +
-            " " +
-            (pressed ? "1" : "0")
-        );
-
         if (GUICapture)
         {
             if (action == "forward")
@@ -263,55 +162,40 @@ namespace
             {
                 PostGuiKey(GK_RIGHT, pressed);
             }
-            else if (
-                action == "use" ||
-                action == "attack"
-            )
+            else if (action == "use" || action == "attack")
             {
+                /*
+                 * Enter e Ctrl confirmam menus e liberam telas "press any key".
+                 */
                 PostGuiKey(GK_RETURN, pressed);
             }
 
             return;
         }
 
-        if (action == "forward")
+        static const std::set<std::string> allowedGameplayActions = {
+            "forward",
+            "back",
+            "left",
+            "right",
+            "attack",
+            "use",
+            "speed"
+        };
+
+        if (allowedGameplayActions.find(action) ==
+            allowedGameplayActions.end())
         {
-            PostNativeKey(KEY_UPARROW, pressed);
+            return;
         }
-        else if (action == "back")
-        {
-            PostNativeKey(KEY_DOWNARROW, pressed);
-        }
-        else if (action == "left")
-        {
-            PostNativeKey(KEY_LEFTARROW, pressed);
-        }
-        else if (action == "right")
-        {
-            PostNativeKey(KEY_RIGHTARROW, pressed);
-        }
-        else if (action == "attack")
-        {
-            PostNativeKey(KEY_RCTRL, pressed);
-        }
-        else if (action == "use")
-        {
-            PostNativeKey(
-                KEY_ENTER,
-                pressed,
-                GK_RETURN
-            );
-        }
-        else if (action == "speed")
-        {
-            PostNativeKey(KEY_RSHIFT, pressed);
-        }
+
+        QueueConsoleCommand(
+            std::string(pressed ? "+" : "-") + action
+        );
     }
 
     void ProcessPulseCommand(const std::string& command)
     {
-        LogInput("pulse " + command);
-
         if (command == "weapprev")
         {
             if (GUICapture)
@@ -320,10 +204,7 @@ namespace
             }
             else
             {
-                /*
-                 * Mantém o comando sem depender do binding local da instalação.
-                 */
-                QueueConsoleCommand("weapprev");
+                QueueConsoleCommand(command);
             }
         }
         else if (command == "weapnext")
@@ -334,23 +215,14 @@ namespace
             }
             else
             {
-                QueueConsoleCommand("weapnext");
+                QueueConsoleCommand(command);
             }
         }
     }
 
     void ProcessCommand(const std::string& raw)
     {
-        const std::string commandLine = Trim(raw);
-
-        if (commandLine.empty())
-        {
-            return;
-        }
-
-        LogInput("received " + commandLine);
-
-        std::istringstream input(commandLine);
+        std::istringstream input(Trim(raw));
         std::string operation;
         input >> operation;
 
@@ -362,9 +234,7 @@ namespace
             if (SafeToken(slot))
             {
                 QueueConsoleCommand(
-                    "save " +
-                    slot +
-                    " \"DoomCraft Auto Save\""
+                    "save " + slot + " \"DoomCraft Auto Save\""
                 );
             }
         }
@@ -394,23 +264,14 @@ namespace
         {
             std::string action;
             int pressedValue = 0;
-
             input >> action >> pressedValue;
-
-            ProcessAction(
-                action,
-                pressedValue != 0
-            );
+            ProcessAction(action, pressedValue != 0);
         }
         else if (operation == "COMMAND")
         {
             std::string command;
             input >> command;
             ProcessPulseCommand(command);
-        }
-        else
-        {
-            LogInput("ignored operation " + operation);
         }
     }
 
@@ -424,18 +285,11 @@ namespace
         std::vector<fs::path> files;
         std::error_code error;
 
-        for (
-            const auto& entry :
-            fs::directory_iterator(
-                commandDirectory,
-                error
-            )
-        )
+        for (const auto& entry :
+             fs::directory_iterator(commandDirectory, error))
         {
-            if (
-                entry.is_regular_file() &&
-                entry.path().extension() == ".cmd"
-            )
+            if (entry.is_regular_file() &&
+                entry.path().extension() == ".cmd")
             {
                 files.push_back(entry.path());
             }
@@ -443,18 +297,14 @@ namespace
 
         std::sort(files.begin(), files.end());
 
-        if (files.size() > 64)
+        if (files.size() > 32)
         {
-            files.resize(64);
+            files.resize(32);
         }
 
         for (const fs::path& path : files)
         {
-            std::ifstream stream(
-                path,
-                std::ios::binary
-            );
-
+            std::ifstream stream(path, std::ios::binary);
             std::string line;
             std::getline(stream, line);
 
@@ -467,24 +317,13 @@ namespace
         }
     }
 
-    void AppendU32(
-        std::ofstream& output,
-        uint32_t value
-    )
+    void AppendU32(std::ofstream& output, uint32_t value)
     {
         const unsigned char bytes[4] = {
-            static_cast<unsigned char>(
-                value & 0xff
-            ),
-            static_cast<unsigned char>(
-                (value >> 8) & 0xff
-            ),
-            static_cast<unsigned char>(
-                (value >> 16) & 0xff
-            ),
-            static_cast<unsigned char>(
-                (value >> 24) & 0xff
-            )
+            static_cast<unsigned char>(value & 0xff),
+            static_cast<unsigned char>((value >> 8) & 0xff),
+            static_cast<unsigned char>((value >> 16) & 0xff),
+            static_cast<unsigned char>((value >> 24) & 0xff)
         };
 
         output.write(
@@ -493,23 +332,16 @@ namespace
         );
     }
 
-    void AppendU64(
-        std::ofstream& output,
-        uint64_t value
-    )
+    void AppendU64(std::ofstream& output, uint64_t value)
     {
         AppendU32(
             output,
-            static_cast<uint32_t>(
-                value & 0xffffffffULL
-            )
+            static_cast<uint32_t>(value & 0xffffffffULL)
         );
 
         AppendU32(
             output,
-            static_cast<uint32_t>(
-                value >> 32
-            )
+            static_cast<uint32_t>(value >> 32)
         );
     }
 
@@ -527,30 +359,21 @@ namespace
         ESSType colorType = SS_RGB;
         float gamma = 1.0f;
 
-        auto screenshot =
-            framebuffer->GetScreenshotBuffer(
-                pitch,
-                colorType,
-                gamma
-            );
+        auto screenshot = framebuffer->GetScreenshotBuffer(
+            pitch,
+            colorType,
+            gamma
+        );
 
-        if (
-            screenshot.Size() == 0 ||
-            pitch == 0
-        )
+        if (screenshot.Size() == 0 || pitch == 0)
         {
             return false;
         }
 
-        const int sourceWidth =
-            framebuffer->GetWidth();
-        const int sourceHeight =
-            framebuffer->GetHeight();
+        const int sourceWidth = framebuffer->GetWidth();
+        const int sourceHeight = framebuffer->GetHeight();
 
-        if (
-            sourceWidth <= 0 ||
-            sourceHeight <= 0
-        )
+        if (sourceWidth <= 0 || sourceHeight <= 0)
         {
             return false;
         }
@@ -558,73 +381,47 @@ namespace
         const int sourceBytesPerPixel =
             colorType == SS_PAL
                 ? 1
-                : (
-                    colorType == SS_RGB
-                        ? 3
-                        : 4
-                );
+                : (colorType == SS_RGB ? 3 : 4);
 
-        const uint8_t* firstRow =
-            screenshot.Data();
+        const uint8_t* firstRow = screenshot.Data();
 
         if (pitch < 0)
         {
             firstRow +=
-                static_cast<ptrdiff_t>(
-                    sourceHeight - 1
-                ) *
-                static_cast<ptrdiff_t>(
-                    -pitch
-                );
+                static_cast<ptrdiff_t>(sourceHeight - 1) *
+                static_cast<ptrdiff_t>(-pitch);
         }
 
         output.resize(
-            static_cast<size_t>(
-                OUTPUT_WIDTH
-            ) *
+            static_cast<size_t>(OUTPUT_WIDTH) *
             OUTPUT_HEIGHT *
             4
         );
 
-        for (
-            int y = 0;
-            y < OUTPUT_HEIGHT;
-            ++y
-        )
+        for (int y = 0; y < OUTPUT_HEIGHT; ++y)
         {
             const int sourceY = std::clamp(
-                y * sourceHeight /
-                    OUTPUT_HEIGHT,
+                y * sourceHeight / OUTPUT_HEIGHT,
                 0,
                 sourceHeight - 1
             );
 
             const uint8_t* row =
                 firstRow +
-                static_cast<ptrdiff_t>(
-                    sourceY
-                ) *
+                static_cast<ptrdiff_t>(sourceY) *
                 pitch;
 
-            for (
-                int x = 0;
-                x < OUTPUT_WIDTH;
-                ++x
-            )
+            for (int x = 0; x < OUTPUT_WIDTH; ++x)
             {
-                const int sourceX =
-                    std::clamp(
-                        x * sourceWidth /
-                            OUTPUT_WIDTH,
-                        0,
-                        sourceWidth - 1
-                    );
+                const int sourceX = std::clamp(
+                    x * sourceWidth / OUTPUT_WIDTH,
+                    0,
+                    sourceWidth - 1
+                );
 
                 const uint8_t* pixel =
                     row +
-                    static_cast<ptrdiff_t>(
-                        sourceX
-                    ) *
+                    static_cast<ptrdiff_t>(sourceX) *
                     sourceBytesPerPixel;
 
                 const size_t destination =
@@ -638,34 +435,23 @@ namespace
                 if (colorType == SS_PAL)
                 {
                     const auto color =
-                        GPalette.BaseColors[
-                            *pixel
-                        ];
+                        GPalette.BaseColors[*pixel];
 
-                    output[destination + 0] =
-                        color.r;
-                    output[destination + 1] =
-                        color.g;
-                    output[destination + 2] =
-                        color.b;
+                    output[destination + 0] = color.r;
+                    output[destination + 1] = color.g;
+                    output[destination + 2] = color.b;
                 }
                 else if (colorType == SS_RGB)
                 {
-                    output[destination + 0] =
-                        pixel[0];
-                    output[destination + 1] =
-                        pixel[1];
-                    output[destination + 2] =
-                        pixel[2];
+                    output[destination + 0] = pixel[0];
+                    output[destination + 1] = pixel[1];
+                    output[destination + 2] = pixel[2];
                 }
                 else
                 {
-                    output[destination + 0] =
-                        pixel[2];
-                    output[destination + 1] =
-                        pixel[1];
-                    output[destination + 2] =
-                        pixel[0];
+                    output[destination + 0] = pixel[2];
+                    output[destination + 1] = pixel[1];
+                    output[destination + 2] = pixel[0];
                 }
 
                 output[destination + 3] = 255;
@@ -675,9 +461,7 @@ namespace
         return true;
     }
 
-    void WriteFrame(
-        const std::vector<uint8_t>& rgba
-    )
+    void WriteFrame(const std::vector<uint8_t>& rgba)
     {
         const fs::path temporary =
             bridgeDirectory /
@@ -703,24 +487,15 @@ namespace
         AppendU32(output, OUTPUT_WIDTH);
         AppendU32(output, OUTPUT_HEIGHT);
         AppendU64(output, frameSequence);
+        AppendU32(output, FRAME_FORMAT_RGBA8);
         AppendU32(
             output,
-            FRAME_FORMAT_RGBA8
-        );
-        AppendU32(
-            output,
-            static_cast<uint32_t>(
-                rgba.size()
-            )
+            static_cast<uint32_t>(rgba.size())
         );
 
         output.write(
-            reinterpret_cast<const char*>(
-                rgba.data()
-            ),
-            static_cast<std::streamsize>(
-                rgba.size()
-            )
+            reinterpret_cast<const char*>(rgba.data()),
+            static_cast<std::streamsize>(rgba.size())
         );
 
         output.close();
@@ -737,11 +512,7 @@ namespace
         error.clear();
 #endif
 
-        fs::rename(
-            temporary,
-            framePath,
-            error
-        );
+        fs::rename(temporary, framePath, error);
 
         if (error)
         {
@@ -761,9 +532,6 @@ namespace DoomCraftBridge
             return;
         }
 
-        /*
-         * Sempre processa comandos, mesmo se o bridge estiver pausado.
-         */
         ProcessCommands();
 
         if (bridgePaused)
@@ -771,15 +539,11 @@ namespace DoomCraftBridge
             return;
         }
 
-        const auto now =
-            std::chrono::steady_clock::now();
+        const auto now = std::chrono::steady_clock::now();
 
         if (
-            lastFrameTime
-                    .time_since_epoch()
-                    .count() != 0 &&
-            now - lastFrameTime <
-                FRAME_INTERVAL
+            lastFrameTime.time_since_epoch().count() != 0 &&
+            now - lastFrameTime < FRAME_INTERVAL
         )
         {
             return;
