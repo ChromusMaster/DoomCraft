@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract the vendored LZDoom source and apply DoomCraft's bridge patch."""
+"""Extract the vendored LZDoom source and apply DoomCraft's bridge patches."""
 from __future__ import annotations
 
 import shutil
@@ -18,6 +18,7 @@ REQUIRED_SOURCE_FILES = (
     Path("CMakeLists.txt"),
     Path("src/CMakeLists.txt"),
     Path("src/d_main.cpp"),
+    Path("src/common/platform/posix/cocoa/i_video.mm"),
 )
 BRIDGE_FILES = ("doomcraft_bridge.h", "doomcraft_bridge.cpp")
 
@@ -128,12 +129,53 @@ def patch_display() -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def patch_cocoa_no_vulkan() -> None:
+    """
+    Fix LZDoom 4.14.4's Cocoa backend when configured with HAVE_VULKAN=OFF.
+
+    Upstream guards the Vulkan includes and the m_vulkanSurface member, but
+    leaves the I_CreateVulkanSurface declaration and destructor reset
+    unguarded. That makes both macOS x86_64 and ARM64 fail to compile.
+    """
+    path = SOURCE / "src/common/platform/posix/cocoa/i_video.mm"
+    text = path.read_text(encoding="utf-8")
+
+    declaration = (
+        "bool I_CreateVulkanSurface(VkInstance instance, VkSurfaceKHR *surface);\n"
+    )
+    guarded_declaration = (
+        "#ifdef HAVE_VULKAN\n"
+        "bool I_CreateVulkanSurface(VkInstance instance, VkSurfaceKHR *surface);\n"
+        "#endif\n"
+    )
+
+    if guarded_declaration not in text:
+        if declaration not in text:
+            fail("could not locate Cocoa Vulkan surface declaration")
+        text = text.replace(declaration, guarded_declaration, 1)
+
+    reset = "\t\tm_vulkanSurface.reset();\n"
+    guarded_reset = (
+        "#ifdef HAVE_VULKAN\n"
+        "\t\tm_vulkanSurface.reset();\n"
+        "#endif\n"
+    )
+
+    if guarded_reset not in text:
+        if reset not in text:
+            fail("could not locate Cocoa Vulkan surface reset")
+        text = text.replace(reset, guarded_reset, 1)
+
+    path.write_text(text, encoding="utf-8")
+
+
 def verify() -> None:
     required_files = [
         SOURCE / "src/doomcraft_bridge.h",
         SOURCE / "src/doomcraft_bridge.cpp",
         SOURCE / "src/CMakeLists.txt",
         SOURCE / "src/d_main.cpp",
+        SOURCE / "src/common/platform/posix/cocoa/i_video.mm",
     ]
     missing = [str(path) for path in required_files if not path.is_file()]
     if missing:
@@ -141,10 +183,26 @@ def verify() -> None:
 
     cmake = (SOURCE / "src/CMakeLists.txt").read_text(encoding="utf-8")
     main = (SOURCE / "src/d_main.cpp").read_text(encoding="utf-8")
+    cocoa = (
+        SOURCE / "src/common/platform/posix/cocoa/i_video.mm"
+    ).read_text(encoding="utf-8")
+
     checks = (
         ("doomcraft_bridge.cpp" in cmake, "CMake source registration"),
         ('#include "doomcraft_bridge.h"' in main, "bridge include"),
         ("DoomCraftBridge::OnFrame(screen);" in main, "frame hook"),
+        (
+            "#ifdef HAVE_VULKAN\n"
+            "bool I_CreateVulkanSurface(VkInstance instance, VkSurfaceKHR *surface);\n"
+            "#endif\n" in cocoa,
+            "Cocoa Vulkan declaration guard",
+        ),
+        (
+            "#ifdef HAVE_VULKAN\n"
+            "\t\tm_vulkanSurface.reset();\n"
+            "#endif\n" in cocoa,
+            "Cocoa Vulkan destructor guard",
+        ),
     )
     failed = [name for ok, name in checks if not ok]
     if failed:
@@ -156,6 +214,7 @@ def main() -> None:
     copy_bridge()
     patch_cmake()
     patch_display()
+    patch_cocoa_no_vulkan()
     verify()
     print(f"Prepared patched LZDoom source: {SOURCE}")
 
