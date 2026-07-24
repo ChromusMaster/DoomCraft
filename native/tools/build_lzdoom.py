@@ -464,6 +464,131 @@ def bundle_macos_dependencies(executable: Path, runtime_directory: Path, zmusic_
             executable.chmod(0o755)
 
 
+
+def linux_ldd_dependencies(
+    executable: Path,
+    library_directory: Path | None = None,
+) -> tuple[dict[str, Path], list[str], str]:
+    env = os.environ.copy()
+    if library_directory is not None:
+        existing = env.get("LD_LIBRARY_PATH", "").strip()
+        local = str(library_directory.resolve())
+        env["LD_LIBRARY_PATH"] = (
+            local if not existing else local + os.pathsep + existing
+        )
+
+    result = subprocess.run(
+        ["ldd", str(executable)],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=env,
+    )
+    output = result.stdout or ""
+    if result.returncode != 0:
+        fail(
+            f"ldd failed for {executable} with exit code "
+            f"{result.returncode}:\n{output}"
+        )
+
+    resolved: dict[str, Path] = {}
+    missing: list[str] = []
+
+    for line in output.splitlines():
+        stripped = line.strip()
+        if not stripped or "=>" not in stripped:
+            continue
+
+        soname, target = (
+            part.strip()
+            for part in stripped.split("=>", 1)
+        )
+
+        if target.startswith("not found"):
+            missing.append(soname)
+            continue
+
+        path_text = target.split(" (", 1)[0].strip()
+        candidate = Path(path_text)
+        if candidate.is_file():
+            resolved[soname] = candidate.resolve()
+
+    return resolved, missing, output
+
+
+def bundle_linux_dependencies(
+    executable: Path,
+    runtime_directory: Path,
+) -> None:
+    """
+    Bundle ABI-volatile libraries that cannot be assumed to exist on the
+    player's Linux distribution.
+
+    Ubuntu 24.04 currently links LZDoom against libvpx.so.9. Newer Linux
+    releases may ship a different libvpx SONAME, so the GitHub runner's
+    matching library must travel beside the executable. LZDoom already has
+    $ORIGIN in its RUNPATH.
+    """
+    dependencies, missing, output = linux_ldd_dependencies(
+        executable
+    )
+    if missing:
+        fail(
+            "Linux executable has unresolved build-time dependencies: "
+            + ", ".join(sorted(missing))
+            + "\n"
+            + output
+        )
+
+    libvpx_dependencies = {
+        soname: path
+        for soname, path in dependencies.items()
+        if soname.startswith("libvpx.so.")
+    }
+    if not libvpx_dependencies:
+        fail(
+            "LZDoom was expected to link libvpx, but no versioned "
+            "libvpx dependency was found in ldd output:\n"
+            + output
+        )
+
+    for soname, source in sorted(
+        libvpx_dependencies.items()
+    ):
+        target = runtime_directory / soname
+        copy_regular(source, target)
+        print(
+            f"Bundled Linux dependency: "
+            f"{soname} <- {source}"
+        )
+
+    packaged_dependencies, packaged_missing, packaged_output = (
+        linux_ldd_dependencies(
+            executable,
+            runtime_directory,
+        )
+    )
+    if packaged_missing:
+        fail(
+            "Packaged Linux executable still has unresolved dependencies: "
+            + ", ".join(sorted(packaged_missing))
+            + "\n"
+            + packaged_output
+        )
+
+    runtime_root = runtime_directory.resolve()
+    for soname in libvpx_dependencies:
+        resolved = packaged_dependencies.get(soname)
+        if resolved is None:
+            fail(
+                f"Packaged Linux executable no longer resolves {soname}"
+            )
+        if resolved.parent != runtime_root:
+            fail(
+                f"{soname} resolved outside the package: {resolved}"
+            )
+
 def copy_runtime(executable: Path, build: Path, destination: Path, pid: str, zmusic_prefix: Path | None) -> None:
     clean_destination(destination)
 
@@ -502,6 +627,12 @@ def copy_runtime(executable: Path, build: Path, destination: Path, pid: str, zmu
         if pid.startswith("windows"):
             for library in sorted(executable.parent.glob("*.dll")):
                 copy_regular(library, runtime_directory / library.name)
+        elif pid.startswith("linux"):
+            bundle_linux_dependencies(
+                packaged_executable,
+                runtime_directory,
+            )
+            packaged_executable.chmod(0o755)
         else:
             packaged_executable.chmod(0o755)
 
