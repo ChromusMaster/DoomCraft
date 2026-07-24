@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections import deque
 from pathlib import Path
 from typing import Iterable, NoReturn
@@ -402,9 +403,65 @@ def bundle_macos_dependencies(executable: Path, runtime_directory: Path, zmusic_
         if macho.suffix == ".dylib":
             run(["install_name_tool", "-id", f"@loader_path/{macho.name}", macho])
 
-    # Changing Mach-O load commands invalidates signatures. Ad-hoc signing is enough for local loading.
+    # Changing Mach-O load commands invalidates signatures. Ad-hoc signing is
+    # sufficient for the executable and bundled dylibs extracted by DoomCraft.
+    #
+    # Important: Contents/MacOS also contains LZDoom's PK3/data files. When
+    # codesign receives the main executable while it is inside the .app,
+    # macOS resolves it as the app's bundled executable and validates sibling
+    # entries as nested code. Files such as game_support.pk3 are data, not
+    # Mach-O code, so signing fails with "code object is not signed at all".
+    #
+    # Sign the main executable in a temporary non-bundle directory and copy
+    # the signed Mach-O back. A Mach-O signature remains valid after the file
+    # is moved because it signs the file contents, not its filesystem path.
     for macho in sorted(macho_files, key=lambda path: path == executable):
-        run(["codesign", "--force", "--sign", "-", "--timestamp=none", macho])
+        if macho != executable:
+            run([
+                "codesign",
+                "--force",
+                "--sign",
+                "-",
+                "--timestamp=none",
+                macho,
+            ])
+            continue
+
+        with tempfile.TemporaryDirectory(
+            prefix="doomcraft-codesign-"
+        ) as temporary_directory:
+            staged_executable = (
+                Path(temporary_directory) /
+                executable.name
+            )
+            copy_regular(
+                executable,
+                staged_executable,
+            )
+            staged_executable.chmod(0o755)
+
+            run([
+                "codesign",
+                "--force",
+                "--sign",
+                "-",
+                "--timestamp=none",
+                "--identifier",
+                "br.com.chromus.doomcraft.lzdoom",
+                staged_executable,
+            ])
+            run([
+                "codesign",
+                "--verify",
+                "--verbose=2",
+                staged_executable,
+            ])
+
+            copy_regular(
+                staged_executable,
+                executable,
+            )
+            executable.chmod(0o755)
 
 
 def copy_runtime(executable: Path, build: Path, destination: Path, pid: str, zmusic_prefix: Path | None) -> None:
