@@ -1,0 +1,7 @@
+{
+  "parent": "doomcraft:block/television_large_base",
+  "textures": {
+    "wood": "minecraft:block/spruce_planks",
+    "particle": "minecraft:block/spruce_planks"
+  }
+}
