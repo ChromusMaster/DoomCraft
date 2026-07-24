@@ -1,41 +1,146 @@
-# DoomCraft 1.0.0
+<p align="center">
+  <img
+    src="docs/images/doomcraft-banner.png"
+    alt="DoomCraft — Fabric mod para jogar WADs em uma televisão retrô dentro do Minecraft"
+    width="100%"
+  >
+</p>
 
-Mod Fabric para Minecraft Java Edition 26.2 que adiciona uma televisão CRT low-poly capaz de executar WADs por meio de um processo LZDoom 4.14.4 isolado da JVM.
+<h1 align="center">DoomCraft 1.0.0</h1>
 
-## Estado desta entrega
+<p align="center">
+  Uma televisão CRT funcional dentro do Minecraft, executando WADs fornecidos pelo jogador por meio de um processo LZDoom isolado.
+</p>
 
-Este repositório contém:
+<p align="center">
+  <a href="https://github.com/ChromusMaster/DoomCraft/releases">
+    <img alt="Versão mais recente" src="https://img.shields.io/github/v/release/ChromusMaster/DoomCraft?include_prereleases&sort=semver">
+  </a>
+  <a href="https://github.com/ChromusMaster/DoomCraft/actions/workflows/build-multiplatform.yml">
+    <img alt="Build multiplataforma" src="https://github.com/ChromusMaster/DoomCraft/actions/workflows/build-multiplatform.yml/badge.svg">
+  </a>
+  <img alt="Minecraft 26.2" src="https://img.shields.io/badge/Minecraft-26.2-62B47A">
+  <img alt="Fabric Loader 0.19.3" src="https://img.shields.io/badge/Fabric_Loader-0.19.3-DBD0B4">
+  <img alt="Java 25" src="https://img.shields.io/badge/Java-25-E76F00">
+  <a href="LICENSE">
+    <img alt="Licença GPL 3.0" src="https://img.shields.io/github/license/ChromusMaster/DoomCraft">
+  </a>
+</p>
 
-- código-fonte Java completo do mod;
-- recursos, modelos, texturas e receita;
-- fonte original do LZDoom 4.14.4 fornecida pelo solicitante;
-- patch C++ completo do bridge DoomCraft;
-- ferramentas para preparar e compilar a engine nativa;
-- GLB original da televisão como referência artística;
-- validações offline e documentação do protocolo.
+<p align="center">
+  <strong>Linux x86-64 · Windows x86-64 · macOS Intel · macOS Apple Silicon</strong>
+</p>
 
-Não contém:
+---
 
-- WADs comerciais, shareware ou livres;
-- executáveis nativos pré-compilados;
-- `gradle-wrapper.jar`, que deve ser gerado localmente pelo Gradle 9.5.1.
+## Visão geral
 
-## Versões fixadas
+O **DoomCraft** adiciona uma televisão CRT low-poly capaz de executar jogos e modificações no formato WAD dentro do Minecraft Java Edition.
+
+A engine roda em um processo nativo separado da JVM. O mod captura o framebuffer do LZDoom, transmite os comandos do jogador e renderiza a imagem diretamente na tela da televisão colocada no mundo.
+
+> [!IMPORTANT]
+> O DoomCraft **não distribui WADs**. O jogador deve utilizar arquivos obtidos legalmente e colocá-los na pasta indicada pelo mod.
+
+## Recursos principais
+
+- televisão CRT craftável, leve e integrada ao mundo;
+- execução de IWADs e PWADs fornecidos pelo usuário;
+- imagem dinâmica em **640 × 400**, limitada a **30 FPS**;
+- áudio do LZDoom reproduzido normalmente;
+- suporte a Linux, Windows e macOS em um único JAR;
+- variantes visuais baseadas na madeira usada na receita;
+- sessões isoladas por televisão;
+- pausa, hibernação e descarregamento automático por distância;
+- save state automático para continuidade da sessão;
+- savegame manual por tecla, sem necessidade de digitar nomes;
+- limite de memória e watchdog para o processo nativo;
+- estado visual `broken`, com tela rachada;
+- compilação multiplataforma automatizada pelo GitHub Actions.
+
+## Compatibilidade
 
 | Componente | Versão |
 |---|---:|
 | Minecraft Java Edition | 26.2 |
 | Java | 25 |
-| Fabric Loader | 0.19.3 |
-| Fabric API | 0.155.2+26.2 |
+| Fabric Loader | 0.19.3 ou superior compatível |
+| Fabric API | 0.155.2+26.2 ou superior compatível |
 | Fabric Loom | 1.17.16 |
-| Gradle | 9.5.1 |
+| Gradle Wrapper | 9.6.1 |
 | LZDoom | 4.14.4 |
-| ZMusic | 1.1.12, mesma versão fixada pelo script oficial do pacote LZDoom fornecido |
+| ZMusic | 1.1.14 |
 
-Não são usadas versões snapshot, alpha, beta ou release candidate.
+### Plataformas incluídas no JAR multiplataforma
 
-## Receita
+| Plataforma | Arquitetura | Estado |
+|---|---|---|
+| Linux | x86-64 | suportada |
+| Windows | x86-64 | suportada |
+| macOS | Intel x86-64 | suportada |
+| macOS | Apple Silicon ARM64 | suportada |
+
+Linux ARM64 e Windows ARM64 não fazem parte da matriz da versão 1.0.0.
+
+## Instalação
+
+### 1. Instale os requisitos
+
+- Minecraft Java Edition 26.2;
+- Java 25;
+- Fabric Loader 0.19.3;
+- Fabric API 0.155.2+26.2.
+
+### 2. Baixe o mod
+
+Baixe o arquivo:
+
+```text
+doomcraft-1.0.0-multiplatform.jar
+```
+
+na página de [Releases](https://github.com/ChromusMaster/DoomCraft/releases).
+
+### 3. Instale o JAR
+
+Coloque o arquivo na pasta:
+
+```text
+.minecraft/mods/
+```
+
+Não coloque o ZIP do artefato do GitHub Actions diretamente na pasta `mods`. Extraia o ZIP e use somente o arquivo `.jar`.
+
+### 4. Adicione seus WADs
+
+Inicie o jogo uma vez. O DoomCraft criará automaticamente:
+
+```text
+config/doomcraft/wads/
+```
+
+Feche o jogo, coloque seus arquivos `.wad` nessa pasta e abra novamente.
+
+## Carregamento de WADs
+
+A seleção segue esta ordem:
+
+1. procura um IWAD conhecido, como `doom2.wad`, `doom.wad`, `freedoom2.wad` ou equivalente;
+2. trata os demais arquivos `.wad`, em ordem alfabética, como PWADs adicionais;
+3. quando nenhum IWAD reconhecido é encontrado, utiliza o primeiro WAD disponível como IWAD.
+
+Exemplo:
+
+```text
+config/doomcraft/wads/
+├── freedoom2.wad
+├── mapa_adicional.wad
+└── mod_de_armas.wad
+```
+
+Trinta segundos após a entrada no mundo, o mod informa que nenhum WAD é distribuído e apresenta o caminho absoluto da pasta.
+
+## Receita da televisão
 
 ```text
 F F F
@@ -43,215 +148,292 @@ V R V
 T T T
 ```
 
-- `F`: lingote de ferro;
-- `V`: vidraça comum, sem cor;
-- `R`: pó de redstone;
-- `T`: qualquer item da tag de tábuas.
+| Símbolo | Ingrediente |
+|---|---|
+| `F` | lingote de ferro |
+| `V` | vidraça comum, sem cor |
+| `R` | pó de redstone |
+| `T` | qualquer tábua de madeira |
 
-Quando as três tábuas são do mesmo tipo vanilla reconhecido, o bloco usa a respectiva textura. Tábuas de mods, ou uma mistura de madeiras, produzem a variante padrão de carvalho.
+Ingredientes totais:
 
-## Estados por distância
+- 3 lingotes de ferro;
+- 2 vidraças;
+- 1 pó de redstone;
+- 3 tábuas de madeira.
 
-| Distância do jogador mais próximo | Bloco | Processo LZDoom |
-|---:|---|---|
-| 0–4 blocos | `active` | executando em tempo real |
-| >4–8 blocos | `paused` | save automático e pausa |
-| >8 blocos | `off` | save automático, encerramento e RAM liberada |
+Quando as três tábuas são do mesmo tipo vanilla reconhecido, a televisão recebe a textura correspondente. Madeiras de mods, tipos misturados ou madeiras não reconhecidas utilizam a aparência padrão de carvalho.
 
-A transição usa o sistema de save do próprio LZDoom. Isso preserva o estado jogável da fase, inventário, posição, inimigos e scripts persistidos pelo formato de save. Estado puramente transitório de áudio ou do backend de renderização não é uma fotografia byte a byte da memória do processo.
+## Estados da televisão
 
-Somente a televisão mais próxima pode possuir uma sessão nativa no cliente. Essa decisão é deliberada para impedir que dezenas de blocos iniciem dezenas de engines.
+| Distância do jogador mais próximo | Estado | Processo LZDoom | Persistência |
+|---:|---|---|---|
+| 0–4 blocos | `active` | executando em tempo real | sessão ativa |
+| acima de 4 até 8 blocos | `paused` | pausado | save state gerado |
+| acima de 8 blocos | `off` | encerrado e removido da RAM | save state preservado |
+| estado quebrado | `broken` | encerrado | tela rachada |
+
+Somente a televisão mais próxima pode manter uma sessão nativa ativa no cliente. Essa limitação evita que várias TVs iniciem várias engines simultaneamente.
 
 ### Estado quebrado
 
-Agachar e usar a TV alterna `broken`. Esse controle é administrativo/teste. No estado quebrado, a tela rachada é renderizada e qualquer sessão ativa é salva e descarregada.
+Agache e use a televisão para alternar o estado `broken`.
 
-## WADs
+Quando quebrada:
 
-O mod cria automaticamente:
-
-```text
-config/doomcraft/wads/
-```
-
-Trinta segundos após cada entrada em um mundo, uma mensagem informa explicitamente que o mod não inclui WADs e mostra o caminho absoluto da pasta.
-
-A seleção segue esta ordem:
-
-1. nomes conhecidos de IWAD, como `doom2.wad`, `doom.wad`, `freedoom2.wad` e equivalentes;
-2. os demais arquivos `.wad`, em ordem alfabética, são passados como PWADs com `-file`.
-
-Quando não houver um nome conhecido, o primeiro `.wad` será tratado como IWAD. Para evitar ambiguidade, mantenha um IWAD reconhecido na pasta.
-
-Use apenas arquivos que você tenha direito legal de executar.
+- a tela rachada é exibida;
+- os controles são liberados;
+- a sessão ativa é salva;
+- o processo nativo é encerrado.
 
 ## Controles
 
-Pressione `F8` próximo de uma TV ativa para capturar ou liberar os controles.
+Pressione `Insert` próximo de uma televisão ativa para capturar ou liberar os controles.
 
-| Ação Doom | Tecla padrão |
+| Ação | Tecla padrão |
 |---|---|
-| avançar/recuar | setas para cima/baixo |
-| virar | setas esquerda/direita |
-| atacar | Ctrl direito |
-| usar/abrir | Enter |
-| correr | Shift direito |
-| arma anterior/próxima | Page Up/Page Down |
+| capturar ou liberar controles | `Insert` |
+| avançar | seta para cima |
+| recuar | seta para baixo |
+| virar à esquerda | seta para esquerda |
+| virar à direita | seta para direita |
+| atacar | `Ctrl direito` |
+| usar, abrir ou confirmar | `Enter` |
+| correr | `Shift direito` |
+| arma anterior | `Page Up` |
+| próxima arma | `Page Down` |
+| abrir ou voltar em menus | `Backspace` |
+| criar savegame manual | `Home` |
+| carregar o savegame manual mais recente | `End` |
 
-As teclas podem ser alteradas no menu de controles do Minecraft.
+Todos os atalhos podem ser alterados nas configurações de controles do Minecraft.
 
-## Orçamento de memória
+## Saves e persistência
 
-O desenho usa:
+Cada televisão possui um UUID próprio e armazena sua sessão em:
 
-- uma única engine nativa por cliente;
-- framebuffer RGBA de 320×200, aproximadamente 250 KiB;
-- máximo de 35 frames por segundo;
-- watchdog de RSS em 768 MiB;
-- no Linux, `prlimit` com RSS de 768 MiB e espaço de endereçamento de 960 MiB;
+```text
+config/doomcraft/saves/<UUID-DA-TV>/
+```
+
+### Save state automático
+
+O save state automático é utilizado quando:
+
+- o jogador se afasta da televisão;
+- a sessão entra em hibernação;
+- o processo é descarregado da memória;
+- o mundo é fechado.
+
+Ao retornar para a mesma televisão, o mod tenta restaurar esse estado.
+
+### Savegame manual
+
+Pressione `Home` durante o controle da TV para criar um savegame manual.
+
+O identificador interno contém:
+
+```text
+<UUID-DO-JOGADOR>_<TIMESTAMP>_<VERSÃO>_<SEED>_<UUID-DA-TV>
+```
+
+Exemplo:
+
+```text
+3883af685d0346d9b9c277edd936649f_1784913561123_262_M4215249874687_77454164867486a716446655440000
+```
+
+Regras:
+
+- UUIDs são armazenados sem hífens;
+- o timestamp utiliza milissegundos;
+- `26.2` é normalizado para `262`;
+- seeds negativas utilizam o prefixo `M`;
+- quando a seed não está disponível ao cliente, utiliza-se `NOSEED`.
+
+Pressione `End` para carregar o último savegame manual associado à televisão atual.
+
+## Desempenho e segurança
+
+O DoomCraft foi projetado para limitar o impacto do processo nativo:
+
+- uma única engine LZDoom ativa por cliente;
+- framebuffer RGBA de 640 × 400;
+- limite de 30 FPS;
+- watchdog de memória em 768 MiB de RSS;
+- limite de espaço de endereçamento de 960 MiB no Linux;
 - descarregamento completo do processo além de 8 blocos;
-- áudio e joystick desabilitados por padrão com `-nosound` e `-nojoy`;
-- backend Softpoly solicitado com `+vid_preferbackend 2`, evitando depender do renderer OpenGL para a captura da TV.
+- joystick desabilitado por padrão;
+- backend Softpoly solicitado com `+vid_preferbackend 2`;
+- comunicação por arquivos atômicos, sem JNI;
+- executável nativo isolado da heap da JVM.
 
-O limite se aplica aos recursos atribuíveis ao DoomCraft, não à JVM inteira do Minecraft. No Linux há limite de processo preventivo mais watchdog; no Windows e macOS há watchdog e encerramento quando o limite é detectado. Métricas de RSS e bibliotecas compartilhadas variam por sistema operacional, portanto nenhum processo externo consegue garantir contabilização idêntica em todos os sistemas.
+O limite de 1 GB é uma meta operacional do mod. A contabilização de bibliotecas compartilhadas e memória residente pode variar entre sistemas operacionais.
 
-## Pré-requisitos
+## Arquitetura
 
-### Comuns
+```text
+Minecraft / Fabric
+└── DoomClientRuntime
+    ├── detecção de proximidade
+    ├── estados active / paused / off / broken
+    ├── DoomSession
+    │   ├── processo LZDoom isolado
+    │   ├── monitoramento de memória
+    │   ├── saves por UUID da TV
+    │   └── gerenciamento do ciclo de vida
+    ├── fila de comandos atômicos
+    ├── leitura do framebuffer
+    └── DynamicTexture + BlockEntityRenderer
 
-- JDK 25 estável;
-- Python 3.11 ou superior;
+LZDoom modificado
+└── DoomCraftBridge
+    ├── captura de GetScreenshotBuffer()
+    ├── conversão para framebuffer 640 × 400
+    ├── SAVE / LOAD / PAUSE / RESUME / QUIT
+    ├── encaminhamento de ações do jogador
+    └── allowlist de comandos
+```
+
+Não há JNI. Uma falha no processo nativo não corrompe diretamente a heap do Minecraft.
+
+## Compilação
+
+### Pré-requisitos para desenvolvimento
+
+- JDK 25;
+- Python 3.13 recomendado;
 - Git;
 - CMake;
 - Ninja;
-- compilador C/C++ com suporte a C++17;
-- Gradle 9.5.1 para gerar inicialmente o wrapper.
+- compilador C/C++ com suporte a C++17.
 
-### Linux Debian/Ubuntu
+O projeto utiliza o Gradle Wrapper 9.6.1. Não é necessário instalar o Gradle globalmente para os builds normais.
 
-O próprio pacote LZDoom fornecido cita como base `nasm`, `autoconf`, `libtool`, `libsystemd-dev`, Clang/GCC, `libx11-dev`, `libsdl2-dev` e `libgtk-3-dev`. Uma instalação típica é:
-
-```bash
-sudo apt update
-sudo apt install -y \
-  git python3 cmake ninja-build build-essential clang nasm autoconf libtool \
-  libsystemd-dev libx11-dev libsdl2-dev libgtk-3-dev \
-  libopenal-dev libvpx-dev libbz2-dev zlib1g-dev libjpeg-dev
-```
-
-A lista exata pode variar conforme a distribuição e as opções do CMake.
-
-## Compilação passo a passo
-
-### 1. Gerar o Gradle Wrapper
-
-O ZIP não distribui binários de wrapper. Com Gradle 9.5.1 instalado:
+### Compilar o código Java e o mod
 
 ```bash
-gradle wrapper --gradle-version 9.5.1
+./gradlew clean build \
+  -x verifyDoomCraftSource \
+  --no-configuration-cache \
+  --stacktrace
 ```
 
-Depois disso, use sempre `./gradlew` no Linux/macOS ou `gradlew.bat` no Windows.
-
-### 2. Validar e preparar o LZDoom
-
-```bash
-./gradlew verifyDoomCraftSource prepareLzDoom
-```
-
-O código é extraído em `native/work/lzdoom-l4.14.4/` e recebe apenas duas alterações:
-
-- registro de `doomcraft_bridge.cpp` no CMake;
-- chamada `DoomCraftBridge::OnFrame(screen)` depois de `screen->Update()`.
-
-### 3. Compilar a engine nativa
-
-```bash
-./gradlew buildNative
-```
-
-A tarefa:
-
-1. baixa o ZMusic 1.1.12 do repositório oficial, se necessário;
-2. compila e instala o ZMusic localmente;
-3. configura e compila o LZDoom 4.14.4 com o bridge;
-4. copia executável, PK3s e bibliotecas necessárias para `src/main/resources/natives/<plataforma>/`;
-5. gera `native-manifest.txt`.
-
-Variáveis opcionais:
-
-```bash
-export DOOMCRAFT_CMAKE_GENERATOR=Ninja
-export DOOMCRAFT_CMAKE_ARGS='-DUMA_OPCAO=VALOR;-DOUTRA_OPCAO=VALOR'
-export DOOMCRAFT_ZMUSIC_CMAKE_ARGS='-DUMA_OPCAO=VALOR'
-```
-
-Para usar uma instalação de ZMusic já disponível pelo sistema:
-
-```bash
-export DOOMCRAFT_SKIP_ZMUSIC=1
-export DOOMCRAFT_CMAKE_ARGS='-DCMAKE_PREFIX_PATH=/caminho/do/zmusic'
-./gradlew buildNative
-```
-
-### 4. Compilar o mod
-
-```bash
-./gradlew clean build
-```
-
-Saída esperada:
+Saída:
 
 ```text
 build/libs/doomcraft-1.0.0.jar
 ```
 
-### 5. Instalar
+> [!WARNING]
+> Um build local só será executável quando os recursos nativos da plataforma estiverem presentes em `src/main/resources/natives/`. Para distribuição, utilize o workflow multiplataforma.
 
-1. instale Fabric Loader 0.19.3 para Minecraft 26.2;
-2. coloque Fabric API 0.155.2+26.2 na pasta `mods`;
-3. coloque `doomcraft-1.0.0.jar` na pasta `mods`;
-4. inicie o jogo uma vez;
-5. coloque o IWAD e eventuais PWADs em `config/doomcraft/wads/`.
+### Preparar e compilar o LZDoom localmente
 
-## Compilação para várias plataformas
-
-Executáveis nativos não são portáveis. Execute `buildNative` em cada sistema/arquitetura desejado:
-
-- `linux-x86_64`;
-- `linux-arm64`;
-- `windows-x86_64`;
-- `windows-arm64`;
-- `macos-x86_64`;
-- `macos-arm64`.
-
-Copie os diretórios produzidos para `src/main/resources/natives/` e só então gere o JAR final. O carregador escolhe exclusivamente o diretório correspondente à plataforma atual.
-
-## Estrutura técnica
-
-```text
-Minecraft/Fabric
-  └─ DoomClientRuntime
-      ├─ proximidade e estados
-      ├─ DoomSession: processo nativo único
-      ├─ arquivo de comandos atômico
-      ├─ framebuffer RGBA atômico
-      └─ DynamicTexture + BlockEntityRenderer
-
-LZDoom modificado
-  └─ DoomCraftBridge
-      ├─ captura GetScreenshotBuffer()
-      ├─ escala para 320×200
-      ├─ SAVE/LOAD/PAUSE/RESUME/QUIT
-      └─ comandos de controle permitidos por allowlist
+```bash
+./gradlew verifyDoomCraftSource prepareLzDoom buildNative
 ```
 
-Não há JNI. Uma falha nativa não corrompe diretamente a heap da JVM.
+O pipeline:
 
-## Modelo 3D
+1. extrai e valida o LZDoom 4.14.4;
+2. aplica o bridge do DoomCraft;
+3. compila ou utiliza o ZMusic compatível;
+4. compila a engine nativa;
+5. copia executável, PK3s e bibliotecas;
+6. gera `native-manifest.txt` e `native-build-id.txt`.
 
-`reference/minedoom_lowpoly_crt_tv.glb` é preservado como referência. O runtime usa um modelo JSON cuboidal significativamente mais leve e um quad dinâmico separado para a tela. O pipeline padrão de modelos de blocos do Minecraft/Fabric não consome GLB diretamente.
+### Gerar o JAR multiplataforma
+
+O workflow:
+
+```text
+.github/workflows/build-multiplatform.yml
+```
+
+executa builds independentes em:
+
+```text
+ubuntu-24.04
+windows-2022
+macos-15-intel
+macos-15
+```
+
+Depois reúne os quatro pacotes e gera:
+
+```text
+doomcraft-1.0.0-multiplatform.jar
+```
+
+Execução manual:
+
+```text
+Actions
+→ DoomCraft - Build Multiplataforma
+→ Run workflow
+→ main
+```
+
+Tags no formato `v*`, como `v1.0.0`, também executam o pipeline e publicam uma GitHub Release.
+
+## Estrutura relevante do repositório
+
+```text
+.github/workflows/        GitHub Actions
+native/bridge/            bridge C++ DoomCraft
+native/tools/             preparação e build do LZDoom
+native/vendor/            fonte vendorizada da engine
+scripts/ci/               instalação, montagem e validações
+src/client/java/          runtime e renderização no cliente
+src/main/java/            blocos, itens e registros comuns
+src/main/resources/       modelos, texturas, traduções e nativos
+reference/                referência artística da televisão
+docs/                     documentação
+```
+
+## Problemas conhecidos da versão 1.0.0
+
+- O campo textual do menu `Save Game` do LZDoom não recebe letras e números encaminhados pelo Minecraft. Utilize `Home` para salvar e `End` para carregar.
+- Destruir e recolocar uma televisão cria um novo UUID. Os saves antigos permanecem preservados em `config/doomcraft/saves/`, mas não são associados automaticamente à nova TV.
+- Teclados compactos e alguns teclados de notebooks ou Macs podem não possuir teclas dedicadas `Insert`, `Home` e `End`. Os atalhos podem ser remapeados no Minecraft.
+- Apenas uma televisão pode manter uma sessão nativa ativa por cliente.
+- Em servidores multiplayer, a seed pode não estar disponível ao cliente; nesse caso, o save utiliza `NOSEED`.
+
+## WADs, marcas e distribuição
+
+O DoomCraft:
+
+- não inclui WADs;
+- não distribui conteúdo comercial, shareware ou livre de terceiros;
+- não concede licença sobre jogos, mapas, texturas ou demais conteúdos carregados pelo usuário;
+- exige que o usuário possua o direito de executar os arquivos adicionados.
+
+DoomCraft é um projeto independente e não é afiliado, aprovado ou patrocinado por Mojang Studios, Microsoft, id Software, ZDoom, FabricMC ou GitHub.
 
 ## Licença
 
-O projeto e a modificação da engine são distribuídos sob GPL-3.0-only. Consulte `LICENSE` e `THIRD_PARTY_NOTICES.md`.
+O código do DoomCraft e as modificações distribuídas neste repositório estão licenciados sob:
+
+```text
+GPL-3.0-only
+```
+
+Consulte:
+
+- [`LICENSE`](LICENSE)
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+
+## Créditos
+
+- **Chromus Master** — criação e desenvolvimento do DoomCraft;
+- **FabricMC** — modloader e APIs;
+- **LZDoom / GZDoom / ZDoom** — base da engine integrada;
+- **ZMusic** — subsistema de áudio;
+- comunidade de software livre e mantenedores das dependências utilizadas.
+
+---
+
+<p align="center">
+  <strong>DoomCraft não inclui WADs. Use somente arquivos obtidos legalmente.</strong>
+</p>
