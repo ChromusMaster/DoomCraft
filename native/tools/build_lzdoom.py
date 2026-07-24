@@ -145,7 +145,7 @@ def ensure_zmusic(generator: str, pid: str) -> Path | None:
 
     if pid.startswith("macos"):
         architecture = "arm64" if pid.endswith("arm64") else "x86_64"
-        deployment = "11.0" if architecture == "arm64" else "10.13"
+        deployment = "11.0" if architecture == "arm64" else "10.15"
         configure.extend([
             f"-DCMAKE_OSX_ARCHITECTURES={architecture}",
             f"-DCMAKE_OSX_DEPLOYMENT_TARGET={deployment}",
@@ -236,7 +236,7 @@ def configure_lzdoom(generator: str, pid: str, build: Path, zmusic_prefix: Path 
 
         if pid.startswith("macos"):
             architecture = "arm64" if pid.endswith("arm64") else "x86_64"
-            deployment = "11.0" if architecture == "arm64" else "10.13"
+            deployment = "11.0" if architecture == "arm64" else "10.15"
             configure.extend([
                 f"-DCMAKE_OSX_ARCHITECTURES={architecture}",
                 f"-DCMAKE_OSX_DEPLOYMENT_TARGET={deployment}",

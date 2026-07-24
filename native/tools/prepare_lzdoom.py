@@ -169,6 +169,34 @@ def patch_cocoa_no_vulkan() -> None:
     path.write_text(text, encoding="utf-8")
 
 
+
+def patch_macos_deployment_target() -> None:
+    """
+    Make LZDoom respect the deployment target supplied by DoomCraft.
+
+    LZDoom 4.14.4 hardcodes macOS 10.13 after project configuration. That
+    overrides -DCMAKE_OSX_DEPLOYMENT_TARGET and makes std::filesystem
+    unavailable. DoomCraft requires macOS 10.15 on Intel and macOS 11.0 on
+    Apple Silicon.
+    """
+    path = SOURCE / "CMakeLists.txt"
+    text = path.read_text(encoding="utf-8")
+
+    original = '\t\tset(CMAKE_OSX_DEPLOYMENT_TARGET "10.13")\n'
+    replacement = (
+        "\t\tif(NOT CMAKE_OSX_DEPLOYMENT_TARGET)\n"
+        '\t\t\tset(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING '
+        '"Minimum supported macOS version")\n'
+        "\t\tendif()\n"
+    )
+
+    if replacement not in text:
+        if original not in text:
+            fail("could not locate LZDoom macOS deployment target override")
+        text = text.replace(original, replacement, 1)
+
+    path.write_text(text, encoding="utf-8")
+
 def verify() -> None:
     required_files = [
         SOURCE / "src/doomcraft_bridge.h",
@@ -176,6 +204,7 @@ def verify() -> None:
         SOURCE / "src/CMakeLists.txt",
         SOURCE / "src/d_main.cpp",
         SOURCE / "src/common/platform/posix/cocoa/i_video.mm",
+        SOURCE / "CMakeLists.txt",
     ]
     missing = [str(path) for path in required_files if not path.is_file()]
     if missing:
@@ -186,6 +215,7 @@ def verify() -> None:
     cocoa = (
         SOURCE / "src/common/platform/posix/cocoa/i_video.mm"
     ).read_text(encoding="utf-8")
+    root_cmake = (SOURCE / "CMakeLists.txt").read_text(encoding="utf-8")
 
     checks = (
         ("doomcraft_bridge.cpp" in cmake, "CMake source registration"),
@@ -203,6 +233,11 @@ def verify() -> None:
             "#endif\n" in cocoa,
             "Cocoa Vulkan destructor guard",
         ),
+        (
+            'if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)' in root_cmake
+            and '"10.15" CACHE STRING' in root_cmake,
+            "macOS deployment target override guard",
+        ),
     )
     failed = [name for ok, name in checks if not ok]
     if failed:
@@ -215,6 +250,7 @@ def main() -> None:
     patch_cmake()
     patch_display()
     patch_cocoa_no_vulkan()
+    patch_macos_deployment_target()
     verify()
     print(f"Prepared patched LZDoom source: {SOURCE}")
 
