@@ -23,6 +23,8 @@ public final class DoomKeyMappings {
     private static KeyMapping previousWeapon;
     private static KeyMapping nextWeapon;
     private static KeyMapping menuBack;
+    private static KeyMapping manualSave;
+    private static KeyMapping loadLatestManualSave;
 
     private DoomKeyMappings() {
     }
@@ -30,7 +32,7 @@ public final class DoomKeyMappings {
     public static void initialize(DoomClientRuntime runtime) {
         toggleFocus = register(
                 "key.doomcraft.focus",
-                GLFW.GLFW_KEY_F8
+                GLFW.GLFW_KEY_INSERT
         );
 
         HELD_ACTIONS.put(
@@ -109,6 +111,16 @@ public final class DoomKeyMappings {
                 GLFW.GLFW_KEY_BACKSPACE
         );
 
+        manualSave = register(
+                "key.doomcraft.manual_save",
+                GLFW.GLFW_KEY_HOME
+        );
+
+        loadLatestManualSave = register(
+                "key.doomcraft.load_latest_manual_save",
+                GLFW.GLFW_KEY_END
+        );
+
         ClientTickEvents.END_CLIENT_TICK.register(
                 client -> tick(client, runtime)
         );
@@ -139,6 +151,14 @@ public final class DoomKeyMappings {
         if (!runtime.isInputFocused()) {
             runtime.releaseAllInput();
             return;
+        }
+
+        while (manualSave.consumeClick()) {
+            runtime.createManualSave(client);
+        }
+
+        while (loadLatestManualSave.consumeClick()) {
+            runtime.loadLatestManualSave(client);
         }
 
         HELD_ACTIONS.forEach(

@@ -22,11 +22,19 @@
   "key.doomcraft.run": "Doom: run",
   "key.doomcraft.weapon_previous": "Doom: previous weapon",
   "key.doomcraft.weapon_next": "Doom: next weapon",
+  "key.doomcraft.menu_back": "Doom: back/open menu",
+  "key.doomcraft.manual_save": "Doom: create timestamped savegame",
+  "key.doomcraft.load_latest_manual_save": "Doom: load latest savegame",
   "message.doomcraft.wad_notice": "DoomCraft does not include WAD files. Put your .wad files in: %s",
   "message.doomcraft.no_wad": "No WAD found. Put a .wad file in: %s",
-  "message.doomcraft.controls_enabled": "Doom controls captured. Backspace opens/goes back in menus; F8 releases.",
+  "message.doomcraft.controls_enabled": "Doom controls captured. Insert releases; Home saves; End loads; Backspace opens/goes back in menus.",
   "message.doomcraft.controls_disabled": "Doom controls released.",
   "message.doomcraft.controls_unavailable": "Move within 4 blocks of an active TV with an available WAD.",
-  "message.doomcraft.interact_hint": "The TV works automatically. F8 captures controls; Backspace opens/goes back in menus; sneak + use toggles broken state.",
-  "key.doomcraft.menu_back": "Doom: back/open menu"
+  "message.doomcraft.interact_hint": "The TV works automatically. Insert captures controls; Home saves; End loads; Backspace opens/goes back in menus; sneak + use toggles broken state.",
+  "message.doomcraft.manual_save_created": "DoomCraft: savegame created — %s.",
+  "message.doomcraft.manual_save_failed": "DoomCraft: the savegame command could not be queued.",
+  "message.doomcraft.manual_save_unavailable": "DoomCraft: manual save is only available while controlling an active TV.",
+  "message.doomcraft.manual_load_started": "DoomCraft: loading the latest savegame for this TV.",
+  "message.doomcraft.manual_load_missing": "DoomCraft: no manual savegame was found for this TV.",
+  "message.doomcraft.manual_load_unavailable": "DoomCraft: manual load is only available while controlling an active TV."
 }

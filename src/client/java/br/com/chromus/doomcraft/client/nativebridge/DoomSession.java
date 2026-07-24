@@ -34,6 +34,7 @@ public final class DoomSession implements AutoCloseable {
     private final Path saveDirectory;
     private final Path frameFile;
     private final Path logFile;
+    private final Path latestManualSaveFile;
     private final String saveSlot;
     private final AtomicLong commandSequence = new AtomicLong();
     private final FrameFileReader frameReader = new FrameFileReader();
@@ -54,6 +55,7 @@ public final class DoomSession implements AutoCloseable {
         this.saveDirectory = DoomCraftPaths.SAVES.resolve(televisionId.toString());
         this.frameFile = sessionDirectory.resolve("frame.bin");
         this.logFile = DoomCraftPaths.LOGS.resolve("lzdoom-" + televisionId + ".log");
+        this.latestManualSaveFile = saveDirectory.resolve("latest-manual-save.txt");
         this.saveSlot = "doomcraft_" + televisionId.toString().replace("-", "");
     }
 
@@ -213,6 +215,82 @@ public final class DoomSession implements AutoCloseable {
         }
     }
 
+    public boolean createManualSave(
+            String slot
+    ) {
+        if (
+            !isAlive() ||
+            paused ||
+            !isSafeToken(slot)
+        ) {
+            return false;
+        }
+
+        if (!sendCommand("SAVE " + slot)) {
+            return false;
+        }
+
+        try {
+            Files.writeString(
+                    latestManualSaveFile,
+                    slot + System.lineSeparator(),
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+            return true;
+        } catch (IOException exception) {
+            DoomCraft.LOGGER.error(
+                    "Could not persist latest manual save slot '{}'",
+                    slot,
+                    exception
+            );
+            return false;
+        }
+    }
+
+    public boolean loadLatestManualSave() {
+        if (!isAlive() || paused) {
+            return false;
+        }
+
+        try {
+            if (!Files.isRegularFile(latestManualSaveFile)) {
+                return false;
+            }
+
+            String slot = Files
+                    .readString(
+                            latestManualSaveFile,
+                            StandardCharsets.UTF_8
+                    )
+                    .trim();
+
+            if (!isSafeToken(slot)) {
+                DoomCraft.LOGGER.warn(
+                        "Ignoring invalid manual save slot in {}",
+                        latestManualSaveFile
+                );
+                return false;
+            }
+
+            /*
+             * Impede o carregamento automático atrasado do save state da TV
+             * de sobrescrever o carregamento manual solicitado pelo jogador.
+             */
+            loadedExistingSave = true;
+            return sendCommand("LOAD " + slot);
+        } catch (IOException exception) {
+            DoomCraft.LOGGER.error(
+                    "Could not read latest manual save slot from {}",
+                    latestManualSaveFile,
+                    exception
+            );
+            return false;
+        }
+    }
+
     public void requestQuit() {
         if (isAlive()) {
             releaseAllActions();
@@ -238,9 +316,9 @@ public final class DoomSession implements AutoCloseable {
         }
     }
 
-    private void sendCommand(String command) {
+    private boolean sendCommand(String command) {
         if (!isAlive()) {
-            return;
+            return false;
         }
         try {
             Files.createDirectories(commandsDirectory);
@@ -259,17 +337,46 @@ public final class DoomSession implements AutoCloseable {
             } catch (IOException atomicMoveUnavailable) {
                 Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
             }
+            return true;
         } catch (IOException exception) {
             DoomCraft.LOGGER.error("Could not send native command '{}'", command, exception);
+            return false;
         }
     }
 
     private boolean hasExistingSave() {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(saveDirectory)) {
-            return stream.iterator().hasNext();
+            for (Path path : stream) {
+                if (
+                    Files.isRegularFile(path) &&
+                    path.getFileName().toString().startsWith(saveSlot)
+                ) {
+                    return true;
+                }
+            }
+            return false;
         } catch (IOException ignored) {
             return false;
         }
+    }
+
+    private static boolean isSafeToken(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+
+        for (int index = 0; index < token.length(); index++) {
+            char character = token.charAt(index);
+            if (
+                !Character.isLetterOrDigit(character) &&
+                character != '_' &&
+                character != '-'
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void cleanTransientFiles() throws IOException {

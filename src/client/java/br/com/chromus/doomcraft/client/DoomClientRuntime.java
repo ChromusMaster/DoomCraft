@@ -12,10 +12,14 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,6 +32,9 @@ public final class DoomClientRuntime {
     private static final int WAD_NOTICE_TICKS = 20 * 30;
     private static final int SCAN_INTERVAL_TICKS = 10;
     private static final int STOP_DELAY_TICKS = 12;
+    private static final DateTimeFormatter MANUAL_SAVE_TIME_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .withZone(ZoneId.systemDefault());
 
     private final DoomDynamicTexture dynamicTexture = new DoomDynamicTexture();
     private final Map<String, Boolean> inputStates = new HashMap<>();
@@ -283,6 +290,144 @@ public final class DoomClientRuntime {
         if (inputFocused && session != null) {
             session.pulseCommand(command);
         }
+    }
+
+    public void createManualSave(Minecraft client) {
+        if (!manualSaveControlsAvailable(client)) {
+            client.player.sendSystemMessage(
+                    Component.translatable(
+                            "message.doomcraft.manual_save_unavailable"
+                    )
+            );
+            return;
+        }
+
+        long timestamp = System.currentTimeMillis();
+        String slot = createManualSaveSlot(
+                client,
+                timestamp
+        );
+
+        if (session.createManualSave(slot)) {
+            client.player.sendSystemMessage(
+                    Component.translatable(
+                            "message.doomcraft.manual_save_created",
+                            MANUAL_SAVE_TIME_FORMAT.format(
+                                    Instant.ofEpochMilli(timestamp)
+                            )
+                    )
+            );
+        } else {
+            client.player.sendSystemMessage(
+                    Component.translatable(
+                            "message.doomcraft.manual_save_failed"
+                    )
+            );
+        }
+    }
+
+    public void loadLatestManualSave(Minecraft client) {
+        if (!manualSaveControlsAvailable(client)) {
+            client.player.sendSystemMessage(
+                    Component.translatable(
+                            "message.doomcraft.manual_load_unavailable"
+                    )
+            );
+            return;
+        }
+
+        releaseAllInput();
+
+        if (session.loadLatestManualSave()) {
+            client.player.sendSystemMessage(
+                    Component.translatable(
+                            "message.doomcraft.manual_load_started"
+                    )
+            );
+        } else {
+            client.player.sendSystemMessage(
+                    Component.translatable(
+                            "message.doomcraft.manual_load_missing"
+                    )
+            );
+        }
+    }
+
+    private boolean manualSaveControlsAvailable(
+            Minecraft client
+    ) {
+        return inputFocused &&
+                client.player != null &&
+                session != null &&
+                session.isAlive() &&
+                !session.isPaused();
+    }
+
+    private String createManualSaveSlot(
+            Minecraft client,
+            long timestamp
+    ) {
+        String playerId = compactUuid(
+                client.player.getUUID()
+        );
+        String minecraftVersion =
+                minecraftVersionToken();
+        String worldSeed = worldSeedToken(client);
+        String televisionId = compactUuid(
+                session.televisionId()
+        );
+
+        return String.join(
+                "_",
+                playerId,
+                Long.toString(timestamp),
+                minecraftVersion,
+                worldSeed,
+                televisionId
+        );
+    }
+
+    private static String compactUuid(UUID uuid) {
+        return uuid.toString().replace("-", "");
+    }
+
+    private static String minecraftVersionToken() {
+        String version = FabricLoader
+                .getInstance()
+                .getModContainer("minecraft")
+                .map(container ->
+                        container
+                                .getMetadata()
+                                .getVersion()
+                                .getFriendlyString()
+                )
+                .orElse("UNKNOWN");
+
+        String digits = version.replaceAll(
+                "[^0-9]",
+                ""
+        );
+
+        return digits.isBlank()
+                ? "UNKNOWN"
+                : digits;
+    }
+
+    private static String worldSeedToken(
+            Minecraft client
+    ) {
+        var server = client.getSingleplayerServer();
+        if (server == null) {
+            return "NOSEED";
+        }
+
+        String seed = Long.toString(
+                server.overworld().getSeed()
+        );
+
+        return seed.startsWith("-")
+                ? "M" + seed.substring(1)
+                : seed;
     }
 
     public void releaseAllInput() {
