@@ -1,0 +1,178 @@
+name: DoomCraft - Build Multiplataforma
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: doomcraft-multiplatform-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-native:
+    name: Native ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-24.04
+          - platform: windows-x86_64
+            os: windows-2022
+          - platform: macos-x86_64
+            os: macos-15-intel
+          - platform: macos-arm64
+            os: macos-15
+
+    steps:
+      - name: Obter código-fonte
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Configurar Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Instalar dependências Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/ci/install-linux.sh
+
+      - name: Instalar dependências macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/ci/install-macos.sh
+
+      - name: Verificar toolchain Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/ci/install-windows.ps1
+
+      - name: Compilar e empacotar LZDoom
+        shell: bash
+        env:
+          DOOMCRAFT_PLATFORM_ID: ${{ matrix.platform }}
+        run: python native/tools/build_lzdoom.py
+
+      - name: Validar pacote nativo
+        shell: bash
+        run: >-
+          python scripts/ci/validate_native.py
+          "${{ matrix.platform }}"
+          "src/main/resources/natives/${{ matrix.platform }}"
+
+      - name: Enviar pacote nativo
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: src/main/resources/natives/${{ matrix.platform }}
+          if-no-files-found: error
+          retention-days: 7
+
+  assemble-jar:
+    name: Montar JAR multiplataforma
+    needs: build-native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write
+
+    steps:
+      - name: Obter código-fonte
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Configurar Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Baixar pacotes nativos
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native-artifacts
+
+      - name: Reunir pacotes nativos
+        shell: bash
+        run: >-
+          python scripts/ci/assemble_natives.py
+          native-artifacts
+          src/main/resources/natives
+
+      - name: Validar os quatro pacotes
+        shell: bash
+        run: |
+          for platform in linux-x86_64 windows-x86_64 macos-x86_64 macos-arm64; do
+            python scripts/ci/validate_native.py \
+              "$platform" \
+              "src/main/resources/natives/$platform"
+          done
+
+      - name: Compilar JAR multiplataforma
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew clean build \
+            -x verifyDoomCraftSource \
+            --no-configuration-cache \
+            --stacktrace
+
+      - name: Preparar arquivo final
+        id: final
+        shell: bash
+        run: |
+          VERSION="$(sed -n 's/^mod_version=//p' gradle.properties | head -n 1)"
+          SOURCE_JAR="build/libs/doomcraft-${VERSION}.jar"
+          FINAL_JAR="build/libs/doomcraft-${VERSION}-multiplatform.jar"
+          test -f "$SOURCE_JAR"
+          cp "$SOURCE_JAR" "$FINAL_JAR"
+          python scripts/ci/validate_jar.py "$FINAL_JAR"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "jar=$FINAL_JAR" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar JAR como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: DoomCraft-${{ steps.final.outputs.version }}-multiplatform
+          path: ${{ steps.final.outputs.jar }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publicar GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" \
+              "${{ steps.final.outputs.jar }}" \
+              --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              "${{ steps.final.outputs.jar }}" \
+              --title "DoomCraft ${GITHUB_REF_NAME}" \
+              --generate-notes
+          fi

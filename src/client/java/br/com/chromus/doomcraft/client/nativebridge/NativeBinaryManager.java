@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -21,36 +22,58 @@ public final class NativeBinaryManager {
     public static String platformId() {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
-        String normalizedArch = arch.contains("aarch64") || arch.contains("arm64") ? "arm64" : "x86_64";
+        String normalizedArch = arch.contains("aarch64") || arch.contains("arm64")
+                ? "arm64"
+                : "x86_64";
 
-        if (os.contains("win")) return "windows-" + normalizedArch;
-        if (os.contains("mac")) return "macos-" + normalizedArch;
+        if (os.contains("win")) {
+            return "windows-" + normalizedArch;
+        }
+        if (os.contains("mac")) {
+            return "macos-" + normalizedArch;
+        }
         return "linux-" + normalizedArch;
     }
 
     public static Path ensureExecutable() throws IOException {
         String platform = platformId();
-        boolean windows = platform.startsWith("windows");
-        String executableName = windows ? "lzdoom.exe" : "lzdoom";
+        Path executableRelative = executableRelativePath(platform);
         Path targetDirectory = DoomCraftPaths.NATIVE.resolve(platform);
-        Files.createDirectories(targetDirectory);
+        Path executable = targetDirectory.resolve(executableRelative);
 
         List<String> bundledFiles = readManifest(platform);
         if (bundledFiles.isEmpty()) {
             throw new IOException(
                     "Pacote nativo LZDoom ausente para " + platform
-                            + ". Execute ./gradlew buildNative e depois ./gradlew build nesse sistema."
+                            + ". Use o JAR multiplataforma gerado pelo GitHub Actions."
             );
         }
 
+        String expectedBuildId = readResourceText(
+                "/natives/" + platform + "/native-build-id.txt"
+        ).trim();
+        Path installedBuildId = targetDirectory.resolve("native-build-id.txt");
+
+        if (Files.isRegularFile(executable)
+                && Files.isRegularFile(installedBuildId)
+                && Files.readString(installedBuildId, StandardCharsets.UTF_8).trim()
+                .equals(expectedBuildId)) {
+            executable.toFile().setExecutable(true, true);
+            return executable;
+        }
+
+        clearDirectory(targetDirectory);
+        Files.createDirectories(targetDirectory);
+
         for (String relativeName : bundledFiles) {
-            if (relativeName.isBlank() || relativeName.contains("..") || relativeName.startsWith("/")) {
-                throw new IOException("Entrada inválida no manifesto nativo: " + relativeName);
-            }
-            String resource = "/natives/" + platform + "/" + relativeName.replace('\\', '/');
+            validateManifestEntry(relativeName);
+            String normalizedName = relativeName.replace('\\', '/');
+            String resource = "/natives/" + platform + "/" + normalizedName;
             Path target = targetDirectory.resolve(relativeName).normalize();
             if (!target.startsWith(targetDirectory)) {
-                throw new IOException("Caminho nativo escapou do diretório permitido: " + relativeName);
+                throw new IOException(
+                        "Caminho nativo escapou do diretório permitido: " + relativeName
+                );
             }
             Files.createDirectories(target.getParent());
             try (InputStream input = NativeBinaryManager.class.getResourceAsStream(resource)) {
@@ -61,12 +84,53 @@ public final class NativeBinaryManager {
             }
         }
 
-        Path executable = targetDirectory.resolve(executableName);
         if (!Files.isRegularFile(executable)) {
             throw new IOException("Executável não encontrado após extração: " + executable);
         }
         executable.toFile().setExecutable(true, true);
         return executable;
+    }
+
+    private static Path executableRelativePath(String platform) throws IOException {
+        if (platform.equals("windows-x86_64")) {
+            return Path.of("lzdoom.exe");
+        }
+        if (platform.equals("linux-x86_64")) {
+            return Path.of("lzdoom");
+        }
+        if (platform.equals("macos-x86_64") || platform.equals("macos-arm64")) {
+            return Path.of("lzdoom.app", "Contents", "MacOS", "lzdoom");
+        }
+        throw new IOException("Plataforma nativa não suportada nesta versão: " + platform);
+    }
+
+    private static void validateManifestEntry(String relativeName) throws IOException {
+        if (relativeName.isBlank()
+                || relativeName.contains("..")
+                || relativeName.startsWith("/")
+                || relativeName.startsWith("\\")) {
+            throw new IOException("Entrada inválida no manifesto nativo: " + relativeName);
+        }
+    }
+
+    private static void clearDirectory(Path directory) throws IOException {
+        if (!Files.exists(directory)) {
+            return;
+        }
+        try (var paths = Files.walk(directory)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        }
+    }
+
+    private static String readResourceText(String resource) throws IOException {
+        try (InputStream input = NativeBinaryManager.class.getResourceAsStream(resource)) {
+            if (input == null) {
+                throw new IOException("Recurso nativo ausente: " + resource);
+            }
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private static List<String> readManifest(String platform) throws IOException {
@@ -76,11 +140,15 @@ public final class NativeBinaryManager {
                 return List.of();
             }
             List<String> result = new ArrayList<>();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(input, StandardCharsets.UTF_8)
+            )) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
-                    if (!line.isEmpty() && !line.startsWith("#")) result.add(line);
+                    if (!line.isEmpty() && !line.startsWith("#")) {
+                        result.add(line);
+                    }
                 }
             }
             return result;
