@@ -35,11 +35,11 @@ public final class TelevisionBlockEntityRenderer
      * - SCREEN_FRONT fica ligeiramente à frente do vidro,
      *   evitando z-fighting e impedindo que o painel preto oculte o frame.
      */
-    private static final float SCREEN_MIN_X = -5.20f / 16.0f;
-    private static final float SCREEN_MAX_X = 14.20f / 16.0f;
-    private static final float SCREEN_MIN_Y = 5.30f / 16.0f;
-    private static final float SCREEN_MAX_Y = 19.70f / 16.0f;
-    private static final float SCREEN_FRONT = 0.65f / 16.0f;
+    private static final float SCREEN_MIN_X = -10.90f / 16.0f;
+    private static final float SCREEN_MAX_X = 26.90f / 16.0f;
+    private static final float SCREEN_MIN_Y = 3.20f / 16.0f;
+    private static final float SCREEN_MAX_Y = 22.20f / 16.0f;
+    private static final float SCREEN_FRONT = 0.48f / 16.0f;
 
     /*
      * Valor de iluminação máxima usado pelo Minecraft.

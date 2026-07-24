@@ -7,8 +7,8 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 
 public final class DoomDynamicTexture implements AutoCloseable {
-    public static final int WIDTH = 320;
-    public static final int HEIGHT = 200;
+    public static final int WIDTH = 640;
+    public static final int HEIGHT = 400;
     public static final Identifier TEXTURE_ID = DoomCraft.id("doom_framebuffer");
 
     private NativeImage image;

@@ -43,9 +43,9 @@ namespace
     constexpr uint32_t FRAME_MAGIC = 0x31464344;
     constexpr uint32_t FRAME_VERSION = 1;
     constexpr uint32_t FRAME_FORMAT_RGBA8 = 1;
-    constexpr int OUTPUT_WIDTH = 320;
-    constexpr int OUTPUT_HEIGHT = 200;
-    constexpr auto FRAME_INTERVAL = std::chrono::milliseconds(28);
+    constexpr int OUTPUT_WIDTH = 640;
+    constexpr int OUTPUT_HEIGHT = 400;
+    constexpr auto FRAME_INTERVAL = std::chrono::milliseconds(34);
 
     bool initialized = false;
     bool bridgePaused = false;

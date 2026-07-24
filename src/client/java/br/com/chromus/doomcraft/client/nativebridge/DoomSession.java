@@ -114,7 +114,7 @@ public final class DoomSession implements AutoCloseable {
         lzdoomArguments.add("+vid_preferbackend");
         lzdoomArguments.add("2");
         lzdoomArguments.add("+vid_maxfps");
-        lzdoomArguments.add("35");
+        lzdoomArguments.add("30");
 
         List<String> command = applyOperatingSystemLimit(lzdoomArguments);
         ProcessBuilder builder = new ProcessBuilder(command);
