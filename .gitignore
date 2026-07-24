@@ -1,10 +1,44 @@
+# Gradle
 .gradle/
 build/
-run/
 out/
-.idea/
-*.iml
-native/work/
+
+# Execução local
+run/
+
+# Builds nativos gerados
 native/build/
-src/main/resources/natives/
-!src/main/resources/natives/.gitkeep
+native/deps/
+native/work/
+
+# Recursos nativos compilados localmente
+src/main/resources/natives/linux-x86_64/
+src/main/resources/natives/windows-x86_64/
+src/main/resources/natives/macos-x86_64/
+src/main/resources/natives/macos-arm64/
+
+# Configurações e dados locais
+config/
+logs/
+crash-reports/
+*.log
+
+# WADs não distribuídos
+*.wad
+*.WAD
+
+# IDE
+.idea/
+.vscode/
+.classpath
+.project
+.settings/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Backups locais
+*.bak
+*.bak-*
+.doomcraft-*-backup-*/
